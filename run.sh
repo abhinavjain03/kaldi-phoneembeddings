@@ -11,6 +11,8 @@ mfccdir=$exp/mfcc_hires_text
 #VARIABLES
 nj=6
 bnf_dim=300
+cmd=run.pl
+
 
 affix=
 train_stage=-10
@@ -25,19 +27,19 @@ dir=$exp/nnet3/tdnn_${affix}
 
 # train_sets="train_swbd_24000"
 
-mfcc=1
-mfccHires=1
-align=1
-getPhoneAlign=1
-config=1
-egsTrain=1
+mfcc=0
+mfccHires=0
+align=0
+getPhoneAlign=0
+config=0
+egsTrain=0
 train=1
 
 mfccdir=exp/mfcc
 if [ $mfcc -eq 1 ]; then
 	for x in $train_sets; do
 		steps/make_mfcc.sh --nj $nj --cmd "$train_cmd" \
-			data/${x}_hires $exp/make_mfcc/${x} $mfccdir
+			data/${x} $exp/make_mfcc/${x} $mfccdir
 		steps/compute_cmvn_stats.sh data/${x} $exp/make_mfcc/${x} $mfccdir
 		utils/fix_data_dir.sh data/${x}
 	done
@@ -66,13 +68,23 @@ fi
 
 if [ $getPhoneAlign -eq 1 ]; then
 
+	echo "Generating Phone alignments for data..."
 	for x in $train_sets; do
 		dataalidir=$exp/tri4_${x}_ali
 		dataphoneali=$exp/tri4_${x}_phone_ali
+		mkdir -p $dataphoneali
 		$cmd JOB=1:$nj $exp/log/temp.JOB.log \
-			ali-to-phones $swbd_models/tri4/final.mdl \
+			ali-to-phones --per-frame=true $swbd_models/tri4/final.mdl \
     		"ark:gunzip -c $dataalidir/ali.JOB.gz|" "ark:|gzip -c >$dataphoneali/ali.JOB.gz";
+    	cp $dataalidir/final.mdl $dataphoneali
+    	cp $dataalidir/num_jobs $dataphoneali
+    	cp $dataalidir/final.alimdl $dataphoneali
+    	cp $dataalidir/final.mat $dataphoneali
+    	cp $dataalidir/tree $dataphoneali
+    	cp $dataalidir/phones.txt $dataphoneali
+
     done
+    echo "Phone Alignments created."
 fi
 
 
@@ -111,13 +123,13 @@ trainSet=train_swbd_259890
 alidir=$exp/tri4_${trainSet}_phone_ali
 if [ $egsTrain -eq 1 ]; then
 	
-	cmd=run.pl
+	
 	left_context=16
 	right_context=12
 
 	context_opts="--left-context=$left_context --right-context=$right_context"
 
-	transform_dir=${accentalidir}
+	transform_dir=${alidir}
 	cmvn_opts="--norm-means=false --norm-vars=false"
 	extra_opts=()
 	extra_opts+=(--cmvn-opts "$cmvn_opts")
