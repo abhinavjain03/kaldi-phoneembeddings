@@ -7,6 +7,7 @@ swbd_exp=swbd_exp
 swbd_models=${swbd_exp}/trainedModels_onespkmanyseg
 phoneFilePath=${swbd_exp}/data/data/lang/phones.txt
 mfccdir=$exp/mfcc_hires_text
+bnfNnetModelDir=$exp/nnet3/tdnn_swbd259890_bnf300_6layers
 
 #VARIABLES
 nj=6
@@ -169,3 +170,6 @@ if [ $train -eq 1 ]; then
 		--dir $dir  || exit 1;
 
 fi
+
+
+
