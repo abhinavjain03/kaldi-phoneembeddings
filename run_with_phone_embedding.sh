@@ -30,16 +30,17 @@ dir=$exp/nnet3/tdnn_${affix}
 
 mfccBase=0
 mfccHiresBase=0
-mfccSp=1
-mfccHiresSp=1
-get_bnf_feature=0
+mfccSp=0
+mfccHiresSp=0
+get_bnf_features=0
 append_bnf_mfcc=0
 align=0
 ivector=0
 config=0
-egsTrain=0
+egsTrain=1
 train=0
 decode=0
+wer=0
 
 
 mfccdir=exp/mfcc
@@ -133,7 +134,7 @@ if [ $align -eq 1 ]; then
 	#done
 fi
 
-online_ivector_dir=$exp/nnet3/ivectors_{trainSet}_sp_hires
+online_ivector_dir=$exp/nnet3/ivectors_${trainSet}_sp_hires
 if [ $ivector -eq 1 ]; then
   steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj $nj \
     data/${trainSet}_sp_hires ${swbd_models}/nnet_online/extractor $online_ivector_dir || exit 1;
@@ -209,7 +210,7 @@ if [ $train -eq 1 ]; then
     --feat.cmvn-opts="--norm-means=false --norm-vars=false" \
     --trainer.num-epochs 2 \
     --trainer.optimization.num-jobs-initial 3 \
-    --trainer.optimization.num-jobs-final 9 \
+    --trainer.optimization.num-jobs-final 12 \
     --trainer.optimization.initial-effective-lrate 0.0017 \
     --trainer.optimization.final-effective-lrate 0.00017 \
     --egs.dir $dir/egs \
