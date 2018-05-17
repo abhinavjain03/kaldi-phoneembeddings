@@ -38,7 +38,7 @@ align=0
 ivector=0
 config=0
 egsTrain=1
-train=0
+train=1
 decode=0
 wer=0
 
@@ -194,12 +194,27 @@ if [ $egsTrain -eq 1 ]; then
   steps/nnet3/get_egs.sh $egs_opts "${extra_opts[@]}" \
     --num-utts-subset 300 \
     --nj $nj \
+    --nj-shuffle 1 \
       --samples-per-iter 400000 \
+      --shuffle 0 \
       --cmd "$cmd" \
       --frames-per-eg 8 \
       $appended_dir ${dataalidir} $dir/egs || exit 1;
 
 fi
+
+
+# if [ $shuffleonebyone -eq 1 ]; then
+# 	for i in `seq 107`; do
+# 		input=`echo "ark:cat exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs_orig.1.$i.ark exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs_orig.2.$i.ark exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs_orig.3.$i.ark exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs_orig.4.$i.ark exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs_orig.5.$i.ark exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs_orig.6.$i.ark|"`
+# 		echo "###################Shuffling Set $i##########################"
+# 		nnet3-shuffle-egs --srand=$i "$input" ark:exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs.$i.ark 
+# 	 	echo "###################Removing Set $i##########################"
+# 		for x in $(seq 6); do
+# 	 		rm exp/nnet3/tdnn_phone_embed300_ivecs_6layers/egs/egs_orig.$x.$i.ark
+# 		done
+# 	done
+# fi
 
 
 

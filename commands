@@ -1,1 +1,3 @@
 ./run.sh --affix swbd259890_bnf300_6layers
+
+./run_with_phone_embedding.sh --affix phone_embed300_ivecs_6layers
