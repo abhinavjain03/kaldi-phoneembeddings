@@ -42,10 +42,12 @@ samples_per_iter=400000 # this is the target number of egs in each archive of eg
 
 transform_dir=     # If supplied, overrides alidir as the place to find fMLLR transforms
 
+shuffle=1
 stage=0
 nj=6         # This should be set to the maximum number of jobs you are
              # comfortable to run in parallel; you can increase it if your disk
              # speed is greater and you have more machines.
+nj_shuffle=6
 srand=0     # rand seed for nnet3-copy-egs and nnet3-shuffle-egs
 online_ivector_dir=  # can be used if we are including speaker information as iVectors.
 cmvn_opts=  # can be used for specifying CMVN options, if feature type is not lda (if lda,
@@ -382,7 +384,7 @@ if [ $stage -le 5 ]; then
     else
       output_archive="ark:$dir/egs.JOB.ark"
     fi
-    $cmd --max-jobs-run $nj JOB=1:$num_archives_intermediate $dir/log/shuffle.JOB.log \
+    $cmd --max-jobs-run $nj_shuffle JOB=1:$num_archives_intermediate $dir/log/shuffle.JOB.log \
       nnet3-shuffle-egs --srand=\$[JOB+$srand] "ark:cat $egs_list|" $output_archive  || exit 1;
 
     if $generate_egs_scp; then
