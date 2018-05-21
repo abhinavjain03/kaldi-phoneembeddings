@@ -11,7 +11,7 @@ mfccdir=$exp/mfcc_hires_text
 bnfNnetModelDir=$exp/nnet3/tdnn_swbd259890_bnf300_6layers
 
 #VARIABLES
-nj=6
+nj=20
 bnf_dim=300
 cmd=run.pl
 
@@ -37,7 +37,7 @@ append_bnf_mfcc=0
 align=0
 ivector=0
 config=0
-egsTrain=1
+egsTrain=0
 train=1
 decode=0
 wer=0
@@ -98,7 +98,6 @@ fi
 
 if [ $get_bnf_features -eq 1 ]; then
 	for x in $train_sets; do
-		bnf_feat_dir=data/${x}_sp_bnf
 		steps/nnet3/make_bottleneck_features_from_singletask.sh \
 			--nj $nj \
 			--use-gpu true \
@@ -194,7 +193,7 @@ if [ $egsTrain -eq 1 ]; then
   steps/nnet3/get_egs.sh $egs_opts "${extra_opts[@]}" \
     --num-utts-subset 300 \
     --nj $nj \
-    --nj-shuffle 1 \
+    --nj-shuffle 3 \
       --samples-per-iter 400000 \
       --shuffle 0 \
       --cmd "$cmd" \
@@ -225,7 +224,7 @@ if [ $train -eq 1 ]; then
     --feat.cmvn-opts="--norm-means=false --norm-vars=false" \
     --trainer.num-epochs 2 \
     --trainer.optimization.num-jobs-initial 3 \
-    --trainer.optimization.num-jobs-final 12 \
+    --trainer.optimization.num-jobs-final 9 \
     --trainer.optimization.initial-effective-lrate 0.0017 \
     --trainer.optimization.final-effective-lrate 0.00017 \
     --egs.dir $dir/egs \
@@ -240,133 +239,97 @@ if [ $train -eq 1 ]; then
 
 fi
 
-graph_dir=exp/tri4/graph_sw1_tg
+graph_dir=${swbd_models}/tri4/graph_sw1_tg
 if [ $decode -eq 1 ]; then
 
-  mfccdev=0
-  calculatehiresdev=0
-  ivectordev=0
-  get_bnf_features_dev=0
-  append_bnf_mfcc=0
-  decodedev=1
-  # devsets="cv_test_onlyindian cv_dev_nz cv_test_onlynz"
-  devsets="cv_test_onlyindian"
+	mfccdev=0
+	calculatehiresdev=0
+	ivectordev=1
+	get_bnf_features_dev=1
+	append_bnf_mfcc=1
+	decodedev=1
+	devsets="test_cslu_hi"
 
-  mfccdir=exp/mfcc
-  if [ $mfccdev -eq 1 ]; then
-    for x in $devsets; do
-        steps/make_mfcc.sh --nj $nj --mfcc-config conf/mfcc_16k.conf --cmd "$train_cmd" \
-                           data/$x exp/make_mfcc/$x $mfccdir
-        steps/compute_cmvn_stats.sh data/$x exp/make_mfcc/$x $mfccdir
-        utils/fix_data_dir.sh data/$x
-    done
+	mfccdir=exp/mfcc
+	if [ $mfccdev -eq 1 ]; then
+		for x in $devsets; do
+			steps/make_mfcc.sh --nj $nj --cmd "$train_cmd" \
+				data/$x $exp/make_mfcc/$x $mfccdir
+			steps/compute_cmvn_stats.sh data/$x $exp/make_mfcc/$x $mfccdir
+			utils/fix_data_dir.sh data/$x
+		done
+	fi
 
-    echo "============================================="
-    echo "MFCCs DONE!!"
-    echo "============================================="
-  fi
+	#calculate hires mfccs
+	mfcchiresdir=$exp/mfcc_hires
+	if [ $calculatehiresdev -eq 1 ]; then
+		for x in $devsets; do
+			utils/copy_data_dir.sh data/$x data/${x}_hires
+			steps/make_mfcc.sh --nj $nj \
+				--cmd "$train_cmd" data/${x}_hires $exp/make_mfcc/${x}_hires $mfcchiresdir;
+			steps/compute_cmvn_stats.sh data/${x}_hires $exp/make_mfcc/${x}_hires $mfcchiresdir;
+			utils/fix_data_dir.sh data/${x}_hires
+		done
+	fi
+  
+	if [ $ivectordev -eq 1 ]; then
+		for x in $devsets; do
+			# online_ivector_dir=$exp/nnet3/ivectors_${x}
+			# steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj $nj \
+			# 	data/$x  ${swbd_models}/nnet_online/extractor ${online_ivector_dir} || exit 1;
 
-  #calculate hires mfccs
-  mfcchiresdir=exp/mfcc_hires
-  if [ $calculatehiresdev -eq 1 ]; then
-    for x in $devsets; do
-      utils/copy_data_dir.sh data/$x data/${x}_hires
-      steps/make_mfcc.sh --nj $nj --mfcc-config conf/mfcc_hires_16k.conf \
-            --cmd "$train_cmd" data/${x}_hires exp/make_mfcc/${x}_hires $mfcchiresdir;
-        steps/compute_cmvn_stats.sh data/${x}_hires exp/make_mfcc/${x}_hires $mfcchiresdir;
+			online_ivector_dir=$exp/nnet3/ivectors_${x}_hires
+			steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj $nj \
+				data/${x}_hires  ${swbd_models}/nnet_online/extractor ${online_ivector_dir} || exit 1;
+		done
+	fi
 
-      utils/fix_data_dir.sh data/${x}_hires
-    done
-
-    echo "============================================="
-    echo "HIRES MFCCs DONE!!"
-    echo "============================================="
-  fi
+	if [ $get_bnf_features_dev -eq 1 ]; then
+		for x in $devsets; do
+			bnf_feat_dir=data/${x}_bnf
+			steps/nnet3/make_bottleneck_features_from_singletask.sh \
+				--nj $nj \
+				--use-gpu true \
+				--cmd "$train_cmd" \
+				tdnn_bn.renorm data/${x}_hires $bnf_feat_dir \
+				$bnfNnetModelDir $exp/make_bnf/${x} exp/make_bnf
+		done
+	fi
 
   
-  if [ $ivectordev -eq 1 ]; then
-    for x in $devsets; do
-      online_ivector_dir=exp/nnet3/ivectors_${x}
-            steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj $nj \
-        data/$x  exp/nnet3/extractor ${online_ivector_dir} || exit 1;
-
-        #       online_ivector_dir=exp/nnet3/ivectors_${x}_hires
-        #     steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj $nj \
-        # data/${x}_hires  exp/alreadyTrainedModelsOnSwbd/nnet_online/extractor ${online_ivector_dir} || exit 1;
-
-
-
-        echo "============================================="
-        echo "CALCULATION OF IVECTORS DONE!!!!"
-        echo "============================================="
-    done
-  fi
-
-  
-  
-  if [ $get_bnf_features_dev -eq 1 ]; then
-
-    for x in $devsets; do
-      bnf_feat_dir=data/${x}_bnf
-      if [ $singletask -eq 1 ]; then
-        steps/nnet3/make_bottleneck_features_from_singletask.sh \
-        --nj $nj \
-        --use-gpu true \
-        --cmd "$train_cmd" \
-            tdnn_bn.renorm data/${x}_hires $bnf_feat_dir \
-            $bnfNnetModelDir exp/make_bnf/${x} exp/make_bnf
-      else
-              steps/nnet3/make_bottleneck_features.sh \
-      --nj $nj \
-      --use-gpu true \
-      --cmd "$train_cmd" \
-          acc_btn.renorm data/${x}_hires $bnf_feat_dir \
-          $bnfNnetModelDir exp/make_bnf/${x} exp/make_bnf
-        fi
-
-    done
-
-  fi
-
-  
-  dump_bnf_dir=exp/append_mfcc_bnf
-  if [ $append_bnf_mfcc -eq 1 ]; then
-
-    for x in $devsets; do 
-    	bnf_feat_dir=data/${x}_bnf
-      	appended_dir=data/${x}_mfcc_bnf_appended
-      # utils/fix_data_dir.sh $bnf_feat_dir
-      steps/append_feats.sh \
-          --cmd "$train_cmd" \
-          --nj $nj \
-        $bnf_feat_dir data/${x}_hires $appended_dir \
-        exp/append_hires_mfcc_bnf/${x} $dump_bnf_dir || exit 1;
-      steps/compute_cmvn_stats.sh $appended_dir \
-          exp/make_cmvn_mfcc_bnf $dump_bnf_dir || exit 1;
-          utils/fix_data_dir.sh $appended_dir
-    done
-
-  fi
+	dump_bnf_dir=$exp/append_mfcc_bnf
+	if [ $append_bnf_mfcc -eq 1 ]; then
+		for x in $devsets; do 
+			bnf_feat_dir=data/${x}_bnf
+			appended_dir=data/${x}_mfcc_bnf_appended
+			# utils/fix_data_dir.sh $bnf_feat_dir
+			steps/append_feats.sh \
+				--cmd "$train_cmd" \
+				--nj $nj \
+				$bnf_feat_dir data/${x}_hires $appended_dir \
+				$exp/append_hires_mfcc_bnf/${x} $dump_bnf_dir || exit 1;
+			steps/compute_cmvn_stats.sh $appended_dir \
+				$exp/make_cmvn_mfcc_bnf $dump_bnf_dir || exit 1;
+			utils/fix_data_dir.sh $appended_dir
+		done
+	fi
 
 
 
-  if [ $decodedev -eq 1 ]; then
-    for decode_set in $devsets; do
-    	bnf_feat_dir=data/${decode_set}_bnf
-      # appended_dir=data/${decode_set}_mfcc_bnf_appended
-      appended_dir=data/${decode_set}_hires
-      num_jobs=`cat $appended_dir/utt2spk|cut -d' ' -f2|sort -u|wc -l`
-      steps/nnet3/decode.sh --nj $nj --cmd "$decode_cmd" \
-      --online-ivector-dir exp/nnet3/ivectors_${decode_set} \
-        $graph_dir $appended_dir $dir/decode_${decode_set}_new || exit 1;
-      
-    done
-  fi
+	if [ $decodedev -eq 1 ]; then
+		for decode_set in $devsets; do
+			appended_dir=data/${decode_set}_mfcc_bnf_appended
+			# appended_dir=data/${decode_set}_hires
+			steps/nnet3/decode.sh --nj $nj --cmd "$decode_cmd" \
+				--online-ivector-dir $exp/nnet3/ivectors_${decode_set}_hires \
+				$graph_dir $appended_dir $dir/decode_${decode_set} || exit 1;
+		done
+	fi
 fi
 
 
 if [ $wer -eq 1 ]; then
-  #for x in exp/*/decode*; do [ -d $x ] && grep WER $x/wer_* | utils/best_wer.sh; done 
-  for x in ${dir}/decode*; do [ -d $x ] && grep WER $x/wer_* | utils/best_wer.sh; done
-  #for x in exp/*/*/*/decode*; do [ -d $x ] && grep WER $x/wer_* | utils/best_wer.sh; done
+	#for x in exp/*/decode*; do [ -d $x ] && grep WER $x/wer_* | utils/best_wer.sh; done 
+	for x in ${dir}/decode*; do [ -d $x ] && grep WER $x/wer_* | utils/best_wer.sh; done
+	#for x in exp/*/*/*/decode*; do [ -d $x ] && grep WER $x/wer_* | utils/best_wer.sh; done
 fi
